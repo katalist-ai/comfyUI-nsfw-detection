@@ -133,7 +133,7 @@ class NudenetDetector:
     def __init__(self, providers=None):
         self.onnx_session = onnxruntime.InferenceSession(
             os.path.join(os.path.dirname(__file__), "best.onnx"),
-            providers=C.get_available_providers() if not providers else providers,
+            providers=["CPUExecutionProvider"]
         )
         model_inputs = self.onnx_session.get_inputs()
         input_shape = model_inputs[0].shape
