@@ -5,7 +5,6 @@ import cv2
 import numpy as np
 import onnxruntime
 import torch
-from onnxruntime.capi import _pybind_state as C
 
 __labels = [
     "FEMALE_GENITALIA_COVERED",
@@ -37,19 +36,8 @@ classes_to_detect = [
 ]
 
 
-def tensor2rgb(t: torch.Tensor) -> torch.Tensor:
-    size = t.size()
-    if len(size) < 4:
-        return t.unsqueeze(3).repeat(1, 1, 1, 3)
-    if size[3] == 1:
-        return t.repeat(1, 1, 1, 3)
-    elif size[3] == 4:
-        return t[:, :, :, :3]
-    else:
-        return t
-
-
 def preprocess(img: np.ndarray, target_size=320):
+    # assume image of shape (H, W, C), RGB, float32
     img_height, img_width = img.shape[:2]
     # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
@@ -86,7 +74,7 @@ def preprocess(img: np.ndarray, target_size=320):
 
     img = cv2.resize(img, (target_size, target_size))
 
-    image_data = img.astype("float32") / 255.0  # normalize
+    image_data = img.astype("float32")
     image_data = np.transpose(image_data, (2, 0, 1))
     image_data = np.expand_dims(image_data, axis=0)
     return image_data, resize_factor, pad_left, pad_top
@@ -173,16 +161,18 @@ class NudenetDetector:
     CATEGORY = "nsfw"
 
     def detect_and_blur(self, image: torch.Tensor):
-        print('detect and blur')
+        print(os.path.exists(os.path.join(os.path.dirname(__file__), "best.onnx")))
+        print('detect and blur NEW')
         all_detections = []
         all_imgs = []
         print('image sizes:', image.size())
         for i in range(len(image)):
             img = image[i].numpy()
+            print(img.dtype)
             preprocessed_image, resize_factor, pad_left, pad_top = preprocess(
                 img, self.input_width
             )
-            print(preprocessed_image.shape, resize_factor, pad_left, pad_top)
+            print(preprocessed_image.dtype, preprocessed_image.min(), preprocessed_image.max())
             outputs = self.onnx_session.run(None, {self.input_name: preprocessed_image})
             print(outputs[0].shape)
             detections = _postprocess(outputs, resize_factor, pad_left, pad_top)
