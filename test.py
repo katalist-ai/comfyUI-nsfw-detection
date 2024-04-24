@@ -6,7 +6,7 @@ from PIL import Image
 
 
 def main():
-    img = Image.open('test_images/nsfw_example3.png')
+    img = Image.open('test_images/nsfw_example4.png')
     arr = np.asarray(img).astype(np.float32) / 255
     ten = torch.tensor(arr).unsqueeze(0)
     det = NudenetDetector()

@@ -36,6 +36,18 @@ classes_to_detect = [
 ]
 
 
+def pixelate_image(image: np.array, pixel_size: int):
+    # image is a numpy array of shape (H, W, C), float32
+    height, width = image.shape[:2]
+    k = max(height, width) // pixel_size
+    h, w = height // k, width // k
+    temp = cv2.resize(image, (w, h), interpolation=cv2.INTER_LINEAR)
+
+    # Initialize output image
+    output = cv2.resize(temp, (width, height), interpolation=cv2.INTER_NEAREST)
+    return output
+
+
 def preprocess(img: np.ndarray, target_size=320):
     # assume image of shape (H, W, C), RGB, float32
     img_height, img_width = img.shape[:2]
@@ -161,32 +173,28 @@ class NudenetDetector:
     CATEGORY = "nsfw"
 
     def detect_and_blur(self, image: torch.Tensor):
-        print(os.path.exists(os.path.join(os.path.dirname(__file__), "best.onnx")))
-        print('detect and blur NEW')
         all_detections = []
         all_imgs = []
-        print('image sizes:', image.size())
         for i in range(len(image)):
             img = image[i].numpy()
-            print(img.dtype)
             preprocessed_image, resize_factor, pad_left, pad_top = preprocess(
                 img, self.input_width
             )
-            print(preprocessed_image.dtype, preprocessed_image.min(), preprocessed_image.max())
             outputs = self.onnx_session.run(None, {self.input_name: preprocessed_image})
-            print(outputs[0].shape)
             detections = _postprocess(outputs, resize_factor, pad_left, pad_top)
-            print('detections: ', detections)
             detections = [
                 detection for detection in detections if detection["class"] in classes_to_detect
             ]
             all_detections.append(detections)
-            for detection in detections:
-                print('masking: ', detection)
-                box = detection["box"]
-                x, y, w, h = box[0], box[1], box[2], box[3]
-                # change these pixels to pure black
-                img[y: y + h, x: x + w] = (0, 0, 0)
+            if detections:
+                img = pixelate_image(img, 16)
+
+            # for detection in detections:
+            #     print('masking: ', detection)
+            #     box = detection["box"]
+            #     x, y, w, h = box[0], box[1], box[2], box[3]
+            #     # change these pixels to pure black
+            #     img[y: y + h, x: x + w] = (0, 0, 0)
             all_imgs.append(img)
         return (torch.tensor(np.array(all_imgs)),)
 
