@@ -27,13 +27,13 @@ __labels = [
     "BUTTOCKS_COVERED",
 ]
 
-classes_to_detect = [
-    "BUTTOCKS_EXPOSED",
-    "FEMALE_BREAST_EXPOSED",
-    "FEMALE_GENITALIA_EXPOSED",
-    "ANUS_EXPOSED",
-    "MALE_GENITALIA_EXPOSED",
-]
+classes_to_detect = {
+    "BUTTOCKS_EXPOSED": 0.7,
+    "FEMALE_BREAST_EXPOSED": 0.45,
+    "FEMALE_GENITALIA_EXPOSED": 0.45,
+    "ANUS_EXPOSED": 0.45,
+    "MALE_GENITALIA_EXPOSED": 0.45,
+}
 
 
 def pixelate_image(image: np.array, pixel_size: int):
@@ -98,12 +98,10 @@ def _postprocess(output, resize_factor, pad_left, pad_top):
     boxes = []
     scores = []
     class_ids = []
-
     for i in range(rows):
         classes_scores = outputs[i][4:]
         max_score = np.amax(classes_scores)
-
-        if max_score >= 0.2:
+        if max_score >= 0.3:
             class_id = np.argmax(classes_scores)
             x, y, w, h = outputs[i][0], outputs[i][1], outputs[i][2], outputs[i][3]
             left = int(round((x - w * 0.5 - pad_left) * resize_factor))
@@ -173,7 +171,6 @@ class NudenetDetector:
     CATEGORY = "nsfw"
 
     def detect_and_blur(self, image: torch.Tensor):
-        all_detections = []
         all_imgs = []
         for i in range(len(image)):
             img = image[i].numpy()
@@ -183,10 +180,12 @@ class NudenetDetector:
             outputs = self.onnx_session.run(None, {self.input_name: preprocessed_image})
             detections = _postprocess(outputs, resize_factor, pad_left, pad_top)
             detections = [
-                detection for detection in detections if detection["class"] in classes_to_detect
+                detection for detection in detections if
+                detection["class"] in classes_to_detect and detection["score"] > classes_to_detect[detection["class"]]
             ]
-            all_detections.append(detections)
+            # all_detections.append(detections)
             if detections:
+                print("NSFW DETECTED: ", detections)
                 img = pixelate_image(img, 16)
 
             # for detection in detections:
